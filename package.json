@@ -1,0 +1,10 @@
+{
+  "name": "lightsail",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simple web app that opens the AWS account login portal",
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "dev": "python3 -m http.server 5173"
+  }
+}
