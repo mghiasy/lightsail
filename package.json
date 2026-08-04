@@ -2,9 +2,11 @@
   "name": "lightsail",
   "version": "1.0.0",
   "private": true,
-  "description": "Simple web app that opens the AWS account login portal",
+  "description": "Web UI to provision a Lightsail Ubuntu instance via AWS CLI",
   "scripts": {
-    "start": "python3 -m http.server 5173",
-    "dev": "python3 -m http.server 5173"
+    "start": "python3 server.py",
+    "dev": "python3 server.py",
+    "create": "python3 create_instance.py",
+    "cleanup": "python3 cleanup_instance.py"
   }
 }
