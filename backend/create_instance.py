@@ -561,25 +561,15 @@ def main() -> int:
         final_json = parsed["outline"]
         access_key = open_outline_manager_and_get_access_key(final_json)
 
-        if access_key:
-            progress("done", "Outline ready — access key below")
-        else:
-            progress("done", "Outline ready — management JSON below (access key missing)")
+        if not access_key:
+            return fail("Could not get Outline access key")
 
-        print(json.dumps(final_json, indent=2), flush=True)
-        if access_key:
-            print(access_key, flush=True)
+        progress("done", "Outline access key ready")
+        print(access_key, flush=True)
         print(
             json.dumps(
                 {
                     "ok": True,
-                    "instance": INSTANCE_NAME,
-                    "staticIp": public_ip,
-                    "region": REGION,
-                    "availabilityZone": AVAILABILITY_ZONE,
-                    "managementPort": parsed["managementPort"],
-                    "accessKeyPort": parsed["accessKeyPort"],
-                    "outline": final_json,
                     "accessKey": access_key,
                 }
             ),

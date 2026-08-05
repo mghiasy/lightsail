@@ -122,16 +122,9 @@ function finishModal(ok, message, outlineJson = null, errorText = null, accessKe
   closeBtn.hidden = false;
   setButtonsDisabled(false);
 
-  if (ok && (accessKey || outlineJson)) {
+  if (ok && accessKey) {
     jsonEl.hidden = false;
-    const blocks = [];
-    if (accessKey) {
-      blocks.push(`Access key (Key 0):\n${accessKey}`);
-    }
-    if (outlineJson) {
-      blocks.push(`Management JSON:\n${JSON.stringify(outlineJson, null, 2)}`);
-    }
-    jsonEl.textContent = blocks.join("\n\n");
+    jsonEl.textContent = accessKey;
   }
 
   if (!ok) {
@@ -174,7 +167,6 @@ async function runJob({ endpoint, title, steps, successMessage }) {
     let sawError = false;
     let lastMessage = successMessage;
     let errorText = null;
-    let outlineJson = null;
     let accessKey = null;
 
     while (true) {
@@ -209,7 +201,7 @@ async function runJob({ endpoint, title, steps, successMessage }) {
         }
         if (line.startsWith("ss://") || line.startsWith("ssconf://")) {
           accessKey = line;
-          lastMessage = "Access key captured";
+          lastMessage = "Access key ready";
           continue;
         }
         try {
@@ -220,19 +212,9 @@ async function runJob({ endpoint, title, steps, successMessage }) {
             lastMessage = payload.error.split("\n")[0];
             continue;
           }
-          if (payload.apiUrl && payload.certSha256 && !payload.ok) {
-            outlineJson = {
-              apiUrl: payload.apiUrl,
-              certSha256: payload.certSha256,
-            };
-            lastMessage = "Outline JSON captured";
-          }
-          if (payload.ok && payload.outline) {
-            outlineJson = payload.outline;
-            if (payload.accessKey) accessKey = payload.accessKey;
-            lastMessage = accessKey
-              ? `Done — access key ready (${payload.instance})`
-              : `Done — ${payload.instance} @ ${payload.staticIp}`;
+          if (payload.ok && payload.accessKey) {
+            accessKey = payload.accessKey;
+            lastMessage = "Access key ready";
           }
           if (payload.ok && payload.cleaned) {
             lastMessage = "Cleanup complete";
@@ -256,15 +238,8 @@ async function runJob({ endpoint, title, steps, successMessage }) {
           errorText = payload.error;
           lastMessage = payload.error.split("\n")[0];
         }
-        if (payload.ok && payload.outline) outlineJson = payload.outline;
         if (payload.ok && payload.accessKey) accessKey = payload.accessKey;
         if (payload.ok && payload.cleaned) lastMessage = "Cleanup complete";
-        if (payload.apiUrl && payload.certSha256) {
-          outlineJson = {
-            apiUrl: payload.apiUrl,
-            certSha256: payload.certSha256,
-          };
-        }
       } catch {
         // ignore
       }
@@ -273,7 +248,7 @@ async function runJob({ endpoint, title, steps, successMessage }) {
     if (sawError) {
       finishModal(false, lastMessage, null, errorText || lastMessage);
     } else {
-      finishModal(true, lastMessage, outlineJson, null, accessKey);
+      finishModal(true, lastMessage, null, null, accessKey);
     }
   } catch (error) {
     finishModal(false, error.message || "Request failed", null, error.message);

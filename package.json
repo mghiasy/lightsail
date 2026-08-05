@@ -4,9 +4,10 @@
   "private": true,
   "description": "Web UI to provision a Lightsail Ubuntu instance via AWS CLI",
   "scripts": {
-    "start": "python3 server.py",
-    "dev": "python3 server.py",
-    "create": "python3 create_instance.py",
-    "cleanup": "python3 cleanup_instance.py"
+    "start": "python3 backend/server.py",
+    "dev": "python3 backend/server.py",
+    "create": "python3 backend/create_instance.py",
+    "cleanup": "python3 backend/cleanup_instance.py",
+    "ios": "open ios/Lightsail.xcodeproj"
   }
 }
