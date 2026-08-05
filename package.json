@@ -10,8 +10,9 @@
     "cleanup": "python3 backend/cleanup_instance.py",
     "ios": "open ios/Lightsail.xcodeproj",
     "bot": "python3 telegram/bot.py",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "bash scripts/with-node20.sh playwright test",
+    "test:e2e:ui": "bash scripts/with-node20.sh playwright test --ui",
+    "test:e2e:install": "bash scripts/with-node20.sh playwright install chromium"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2"
