@@ -187,8 +187,11 @@ async function runJob({ endpoint, title, steps, successMessage }) {
         }
         if (line.startsWith("FAILED")) {
           sawError = true;
-          lastMessage = line;
-          errorText = line;
+          // Keep a more specific ERROR:/PROGRESS|error message when present.
+          if (!errorText) {
+            errorText = line;
+            lastMessage = line;
+          }
           continue;
         }
         if (handleProgressLine(line)) {
@@ -314,10 +317,18 @@ async function runCleanup() {
           continue;
         }
 
-        if (line.startsWith("ERROR:") || line.startsWith("FAILED")) {
+        if (line.startsWith("ERROR:")) {
           sawError = true;
           errorText = line.replace(/^ERROR:\s*/, "");
           lastMessage = errorText;
+          continue;
+        }
+        if (line.startsWith("FAILED")) {
+          sawError = true;
+          if (!errorText) {
+            errorText = line;
+            lastMessage = line;
+          }
           continue;
         }
 
