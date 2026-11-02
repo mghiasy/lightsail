@@ -25,7 +25,8 @@ const CREATE_STEPS = [
   ["outline", "Install Outline (+ Docker)"],
   ["firewall", "Open Lightsail firewall ports"],
   ["outline_manager", "Open Outline Manager + paste JSON"],
-  ["access_key", "Done → share Key 0 → copy access key"],
+  ["data_limit", "Rename cursor-key → set 2.5TB data limit"],
+  ["access_key", "Share cursor-key → copy access key"],
   ["done", "Complete"],
 ];
 
@@ -116,15 +117,36 @@ function markStep(stepId, message) {
   }
 }
 
+function formatOutlineJson(outlineJson) {
+  if (!outlineJson) return "";
+  if (typeof outlineJson === "string") {
+    try {
+      return JSON.stringify(JSON.parse(outlineJson), null, 2);
+    } catch {
+      return outlineJson;
+    }
+  }
+  return JSON.stringify(outlineJson, null, 2);
+}
+
 function finishModal(ok, message, outlineJson = null, errorText = null, accessKey = null) {
   detailEl.textContent = message;
   detailEl.dataset.kind = ok ? "ok" : "error";
   closeBtn.hidden = false;
   setButtonsDisabled(false);
 
-  if (ok && accessKey) {
+  // Web-only: show access key plus Outline management JSON (apiUrl + certSha256).
+  if (ok && (accessKey || outlineJson)) {
+    const parts = [];
+    if (accessKey) {
+      parts.push(accessKey);
+    }
+    const outlineText = formatOutlineJson(outlineJson);
+    if (outlineText) {
+      parts.push(outlineText);
+    }
     jsonEl.hidden = false;
-    jsonEl.textContent = accessKey;
+    jsonEl.textContent = parts.join("\n\n");
   }
 
   if (!ok) {
@@ -168,6 +190,7 @@ async function runJob({ endpoint, title, steps, successMessage }) {
     let lastMessage = successMessage;
     let errorText = null;
     let accessKey = null;
+    let outlineJson = null;
 
     while (true) {
       const { value, done } = await reader.read();
@@ -219,6 +242,9 @@ async function runJob({ endpoint, title, steps, successMessage }) {
             accessKey = payload.accessKey;
             lastMessage = "Access key ready";
           }
+          if (payload.ok && payload.outline) {
+            outlineJson = payload.outline;
+          }
           if (payload.ok && payload.cleaned) {
             lastMessage = "Cleanup complete";
           }
@@ -242,6 +268,7 @@ async function runJob({ endpoint, title, steps, successMessage }) {
           lastMessage = payload.error.split("\n")[0];
         }
         if (payload.ok && payload.accessKey) accessKey = payload.accessKey;
+        if (payload.ok && payload.outline) outlineJson = payload.outline;
         if (payload.ok && payload.cleaned) lastMessage = "Cleanup complete";
       } catch {
         // ignore
@@ -251,7 +278,7 @@ async function runJob({ endpoint, title, steps, successMessage }) {
     if (sawError) {
       finishModal(false, lastMessage, null, errorText || lastMessage);
     } else {
-      finishModal(true, lastMessage, null, null, accessKey);
+      finishModal(true, lastMessage, outlineJson, null, accessKey);
     }
   } catch (error) {
     finishModal(false, error.message || "Request failed", null, error.message);

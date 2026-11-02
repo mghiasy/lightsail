@@ -21,6 +21,10 @@ async function mockPlainStream(page, pathSuffix, lines) {
 }
 
 function createSuccessLines(accessKey = "ss://test-access-key#outline") {
+  const outline = {
+    apiUrl: "https://203.0.113.10:12345/SecretPrefix",
+    certSha256: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  };
   return [
     "PROGRESS|create|Creating instance cusor_instance…",
     "PROGRESS|created|Instance created",
@@ -34,10 +38,11 @@ function createSuccessLines(accessKey = "ss://test-access-key#outline") {
     "PROGRESS|outline|Outline install finished",
     "PROGRESS|firewall|Lightsail firewall ports opened",
     "PROGRESS|outline_manager|Opening Outline Manager…",
+    "PROGRESS|data_limit|cursor-key data limit set to 2.5TB in Outline Manager",
     "PROGRESS|access_key|Access key fetched from Outline API",
     "PROGRESS|done|Outline access key ready",
     accessKey,
-    JSON.stringify({ ok: true, accessKey }),
+    JSON.stringify({ ok: true, accessKey, outline }),
   ];
 }
 

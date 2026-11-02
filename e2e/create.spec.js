@@ -16,7 +16,7 @@ test.describe("create flow", () => {
     const modal = page.locator("#progress-modal");
     await expect(modal).toBeVisible();
     await expect(page.locator("#progress-title")).toHaveText("Provisioning progress");
-    await expect(page.locator("#progress-steps li")).toHaveCount(14);
+    await expect(page.locator("#progress-steps li")).toHaveCount(15);
 
     await expect(page.locator('#progress-steps li[data-step="done"]')).toHaveAttribute(
       "data-state",
@@ -24,7 +24,9 @@ test.describe("create flow", () => {
     );
     await expect(page.locator("#progress-detail")).toHaveText("Access key ready");
     await expect(page.locator("#progress-json")).toBeVisible();
-    await expect(page.locator("#progress-json")).toHaveText(accessKey);
+    await expect(page.locator("#progress-json")).toContainText(accessKey);
+    await expect(page.locator("#progress-json")).toContainText("apiUrl");
+    await expect(page.locator("#progress-json")).toContainText("certSha256");
     await expect(page.locator("#progress-close")).toBeVisible();
 
     await page.locator("#progress-close").click();

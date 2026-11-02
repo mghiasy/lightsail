@@ -12,12 +12,19 @@ import tempfile
 import time
 from pathlib import Path
 
+from app_paths import applescript_path, aws_command
+
 REGION = "us-west-2"
 AVAILABILITY_ZONE = "us-west-2a"
 INSTANCE_NAME = "cusor_instance"
 STATIC_IP_NAME = "cusor_instance-ip"
 BLUEPRINT_ID = "ubuntu_24_04"
 BUNDLE_ID = "small_3_0"  # ~$12/month
+# Outline Manager UI only accepts GB/MB; 2500 GB = 2.5 TB (SI).
+DATA_LIMIT_TB = 2.5
+DATA_LIMIT_GB = int(DATA_LIMIT_TB * 1000)  # 2500
+DATA_LIMIT_BYTES = DATA_LIMIT_GB * (1000**3)  # matches Manager SI units
+ACCESS_KEY_NAME = "cursor-key"
 OUTLINE_INSTALL_URL = (
     "https://raw.githubusercontent.com/Jigsaw-Code/outline-server/"
     "master/src/server_manager/install_scripts/install_server.sh"
@@ -38,7 +45,7 @@ def log(message: str) -> None:
 
 
 def aws(*args: str) -> dict:
-    cmd = ["aws", "lightsail", *args, "--region", REGION, "--output", "json"]
+    cmd = aws_command(*args)
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "AWS CLI command failed").strip()
@@ -50,17 +57,11 @@ def aws(*args: str) -> dict:
 
 def instance_exists() -> bool:
     result = subprocess.run(
-        [
-            "aws",
-            "lightsail",
+        aws_command(
             "get-instance",
             "--instance-name",
             INSTANCE_NAME,
-            "--region",
-            REGION,
-            "--output",
-            "json",
-        ],
+        ),
         capture_output=True,
         text=True,
     )
@@ -104,17 +105,7 @@ def wait_until_running() -> None:
 
 def get_static_ip_if_exists() -> dict | None:
     result = subprocess.run(
-        [
-            "aws",
-            "lightsail",
-            "get-static-ip",
-            "--static-ip-name",
-            STATIC_IP_NAME,
-            "--region",
-            REGION,
-            "--output",
-            "json",
-        ],
+        aws_command("get-static-ip", "--static-ip-name", STATIC_IP_NAME),
         capture_output=True,
         text=True,
     )
@@ -420,32 +411,93 @@ def read_clipboard() -> str:
     return (result.stdout or "").strip()
 
 
-def fetch_access_key_via_api(outline: dict) -> str | None:
-    """Fetch Key 0 accessUrl from Outline Management API (reliable fallback)."""
+def list_access_keys_via_api(outline: dict) -> list[dict]:
+    """Return Outline Management API accessKeys list, or []."""
     api_url = outline.get("apiUrl", "").rstrip("/")
     if not api_url:
-        return None
-    url = f"{api_url}/access-keys"
+        return []
     result = subprocess.run(
-        ["curl", "-sk", "--max-time", "20", url],
+        ["curl", "-sk", "--max-time", "20", f"{api_url}/access-keys"],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0 or not result.stdout.strip():
-        return None
+        return []
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError:
-        return None
-    keys = payload.get("accessKeys") or []
-    if not keys:
-        return None
-    # Prefer the first key (install script creates Key 0 / first user).
-    for key in keys:
+        return []
+    return list(payload.get("accessKeys") or [])
+
+
+def fetch_access_key_via_api(outline: dict) -> str | None:
+    """Fetch Key 0 accessUrl from Outline Management API (reliable fallback)."""
+    for key in list_access_keys_via_api(outline):
         access_url = key.get("accessUrl") or key.get("access_url")
         if access_url:
             return access_url
     return None
+
+
+def first_access_key_id(outline: dict) -> str | int | None:
+    keys = list_access_keys_via_api(outline)
+    if not keys:
+        return None
+    return keys[0].get("id", 0)
+
+
+def _outline_api_put(outline: dict, path: str, body: dict) -> bool:
+    api_url = outline.get("apiUrl", "").rstrip("/")
+    if not api_url:
+        return False
+    result = subprocess.run(
+        [
+            "curl",
+            "-sk",
+            "--max-time",
+            "20",
+            "-X",
+            "PUT",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            json.dumps(body),
+            f"{api_url}{path}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    # Outline returns 204 No Content on success.
+    return result.returncode == 0 and (
+        result.stdout.strip() == "" or "error" not in (result.stdout or "").lower()
+    )
+
+
+def rename_access_key(
+    outline: dict,
+    name: str = ACCESS_KEY_NAME,
+    key_id: str | int | None = None,
+) -> bool:
+    """Rename first access key via PUT /access-keys/{id}/name."""
+    resolved_id = key_id if key_id is not None else first_access_key_id(outline)
+    if resolved_id is None:
+        return False
+    return _outline_api_put(outline, f"/access-keys/{resolved_id}/name", {"name": name})
+
+
+def set_access_key_data_limit(outline: dict, key_id: str | int | None = None) -> bool:
+    """
+    Set first-key transfer limit via Management API (fallback if Manager UI skipped).
+    PUT /access-keys/{id}/data-limit  body: {"limit":{"bytes":N}}
+    """
+    resolved_id = key_id if key_id is not None else first_access_key_id(outline)
+    if resolved_id is None:
+        return False
+    return _outline_api_put(
+        outline,
+        f"/access-keys/{resolved_id}/data-limit",
+        {"limit": {"bytes": DATA_LIMIT_BYTES}},
+    )
 
 
 def looks_like_access_key(value: str) -> bool:
@@ -455,12 +507,23 @@ def looks_like_access_key(value: str) -> bool:
 
 def open_outline_manager_and_get_access_key(outline: dict) -> str | None:
     """
-    Paste JSON into Outline Manager, click Done, copy Key 0 access key.
+    Rename key to cursor-key, paste JSON into Outline Manager, Done →
+    set 2.5TB data limit → share → copy access key.
     Falls back to Management API. Never fails the run.
     """
     payload = json.dumps(outline, separators=(",", ":"))
     access_key: str | None = None
+    data_limit_set = False
     try:
+        progress("outline_manager", f"Renaming access key to {ACCESS_KEY_NAME}…")
+        if rename_access_key(outline):
+            progress("outline_manager", f"Access key renamed to {ACCESS_KEY_NAME}")
+        else:
+            progress(
+                "outline_manager",
+                f"Could not rename via API yet; Manager UI will try {ACCESS_KEY_NAME}",
+            )
+
         progress("outline_manager", "Copying Outline JSON to clipboard…")
         copy_to_clipboard(payload)
 
@@ -478,18 +541,42 @@ def open_outline_manager_and_get_access_key(outline: dict) -> str | None:
                 f"({(launch.stderr or launch.stdout or 'open failed').strip()})",
             )
         else:
-            script_path = Path(__file__).resolve().parent / "open_outline_manager.applescript"
+            script_path = applescript_path()
             progress(
-                "access_key",
-                "Paste JSON → Done → share Key 0 → Copy access key…",
+                "data_limit",
+                f"Done → rename {ACCESS_KEY_NAME} → set data limit to "
+                f"{DATA_LIMIT_TB}TB ({DATA_LIMIT_GB} GB)…",
             )
             try:
                 result = subprocess.run(
-                    ["osascript", str(script_path), payload],
+                    [
+                        "osascript",
+                        str(script_path),
+                        payload,
+                        str(DATA_LIMIT_GB),
+                        ACCESS_KEY_NAME,
+                    ],
                     capture_output=True,
                     text=True,
-                    timeout=45,
+                    timeout=90,
                 )
+                # If the script completed without error, UI path set the limit.
+                if result.returncode == 0:
+                    data_limit_set = True
+                    progress(
+                        "data_limit",
+                        f"{ACCESS_KEY_NAME} data limit set to {DATA_LIMIT_TB}TB "
+                        "in Outline Manager",
+                    )
+                else:
+                    detail = (result.stderr or result.stdout or "UI automation failed").strip()
+                    progress(
+                        "data_limit",
+                        "Manager data-limit UI unavailable — will use API. "
+                        f"({detail.splitlines()[-1] if detail else 'automation failed'})",
+                    )
+
+                progress("access_key", f"Share {ACCESS_KEY_NAME} → Copy access key…")
                 candidate = (result.stdout or "").strip()
                 if not looks_like_access_key(candidate):
                     candidate = read_clipboard()
@@ -497,15 +584,14 @@ def open_outline_manager_and_get_access_key(outline: dict) -> str | None:
                     access_key = candidate
                     progress("access_key", "Access key copied from Outline Manager")
                 elif result.returncode != 0:
-                    detail = (result.stderr or result.stdout or "UI automation failed").strip()
-                    progress(
-                        "access_key",
-                        "Manager UI copy unavailable — trying API. "
-                        f"({detail.splitlines()[-1] if detail else 'automation failed'})",
-                    )
+                    progress("access_key", "Manager UI copy unavailable — trying API…")
                 else:
                     progress("access_key", "Manager UI did not yield ss:// key — trying API…")
             except subprocess.TimeoutExpired:
+                progress(
+                    "data_limit",
+                    "Manager UI timed out — will set data limit via API…",
+                )
                 progress(
                     "access_key",
                     "Manager UI timed out — fetching access key via API…",
@@ -521,7 +607,29 @@ def open_outline_manager_and_get_access_key(outline: dict) -> str | None:
                 progress(
                     "access_key",
                     "Could not get access key automatically. "
-                    "In Outline Manager: Key 0 → share → Copy access key.",
+                    f"In Outline Manager: {ACCESS_KEY_NAME} → share → Copy access key.",
+                )
+
+        # Ensure name sticks even if Manager UI path skipped rename.
+        rename_access_key(outline)
+
+        if not data_limit_set:
+            progress(
+                "data_limit",
+                f"Setting {ACCESS_KEY_NAME} data limit to {DATA_LIMIT_TB}TB "
+                "via Outline API…",
+            )
+            if set_access_key_data_limit(outline):
+                progress(
+                    "data_limit",
+                    f"{ACCESS_KEY_NAME} data limit set to {DATA_LIMIT_TB}TB via API",
+                )
+            else:
+                progress(
+                    "data_limit",
+                    "Could not set data limit automatically. "
+                    f"In Outline Manager: {ACCESS_KEY_NAME} → ⋮ → Data Limit → "
+                    f"{DATA_LIMIT_GB} GB → Save.",
                 )
     except Exception as exc:  # noqa: BLE001 - never fail provision on Manager step
         progress(
@@ -529,9 +637,17 @@ def open_outline_manager_and_get_access_key(outline: dict) -> str | None:
             f"Access-key step hit an error ({exc}); trying API fallback…",
         )
         try:
+            rename_access_key(outline)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
             access_key = fetch_access_key_via_api(outline)
         except Exception:  # noqa: BLE001
             access_key = None
+        try:
+            set_access_key_data_limit(outline)
+        except Exception:  # noqa: BLE001
+            pass
 
     return access_key
 
@@ -571,6 +687,9 @@ def main() -> int:
                 {
                     "ok": True,
                     "accessKey": access_key,
+                    # Management credentials (apiUrl + certSha256). Web UI shows these;
+                    # iOS/Telegram ignore this field and only surface accessKey.
+                    "outline": final_json,
                 }
             ),
             flush=True,

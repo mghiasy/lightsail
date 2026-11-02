@@ -6,13 +6,21 @@
   "scripts": {
     "start": "python3 backend/server.py",
     "dev": "python3 backend/server.py",
+    "launch": "bash scripts/launch.sh",
+    "stop": "bash scripts/stop.sh",
+    "app": "open dist/Lightsail.app",
+    "build:app": "bash scripts/build-standalone-app.sh",
+    "mobile": "bash -lc 'export PATH=\"$HOME/flutter/bin:$PATH\"; cd mobile && flutter run'",
+    "mobile:apk": "bash -lc 'export PATH=\"$HOME/flutter/bin:$PATH\"; cd mobile && flutter build apk --release'",
+    "mobile:ios": "bash -lc 'export PATH=\"$HOME/flutter/bin:$PATH\"; cd mobile && flutter build ios --release'",
     "create": "python3 backend/create_instance.py",
     "cleanup": "python3 backend/cleanup_instance.py",
     "ios": "open ios/Lightsail.xcodeproj",
     "bot": "python3 telegram/bot.py",
     "test:e2e": "bash scripts/with-node20.sh playwright test",
     "test:e2e:ui": "bash scripts/with-node20.sh playwright test --ui",
-    "test:e2e:install": "bash scripts/with-node20.sh playwright install chromium"
+    "test:e2e:install": "bash scripts/with-node20.sh playwright install chromium",
+    "build:ios": "bash scripts/build-ios-standalone.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2"

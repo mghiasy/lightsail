@@ -8,6 +8,8 @@ import subprocess
 import sys
 import time
 
+from app_paths import aws_command
+
 REGION = "us-west-2"
 INSTANCE_NAME = "cusor_instance"
 STATIC_IP_NAME = "cusor_instance-ip"
@@ -18,7 +20,7 @@ def progress(step: str, message: str) -> None:
 
 
 def aws(*args: str) -> dict:
-    cmd = ["aws", "lightsail", *args, "--region", REGION, "--output", "json"]
+    cmd = aws_command(*args)
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "AWS CLI command failed").strip()
@@ -29,7 +31,7 @@ def aws(*args: str) -> dict:
 
 
 def aws_ok(*args: str) -> tuple[bool, str, dict]:
-    cmd = ["aws", "lightsail", *args, "--region", REGION, "--output", "json"]
+    cmd = aws_command(*args)
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         return False, (result.stderr or result.stdout or "").strip(), {}

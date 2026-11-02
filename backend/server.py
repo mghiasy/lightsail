@@ -6,14 +6,15 @@ from __future__ import annotations
 import subprocess
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parent
-WEB_DIR = BACKEND_DIR.parent / "web"
+from app_paths import backend_dir, web_dir, worker_command
+
+BACKEND_DIR = backend_dir()
+WEB_DIR = web_dir()
 PORT = 5173
-SCRIPTS = {
-    "/api/create-instance": BACKEND_DIR / "create_instance.py",
-    "/api/cleanup-instance": BACKEND_DIR / "cleanup_instance.py",
+API_ACTIONS = {
+    "/api/create-instance": "create-instance",
+    "/api/cleanup-instance": "cleanup-instance",
 }
 
 
@@ -32,8 +33,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        script = SCRIPTS.get(self.path.rstrip("/"))
-        if script is None:
+        action = API_ACTIONS.get(self.path.rstrip("/"))
+        if action is None:
             self.send_error(404, "Not found")
             return
 
@@ -44,7 +45,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
         proc = subprocess.Popen(
-            [sys.executable, str(script)],
+            worker_command(action),
             cwd=str(BACKEND_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

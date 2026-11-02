@@ -32,7 +32,8 @@ struct CreateSteps {
         .init(id: "outline", label: "Install Outline (+ Docker)"),
         .init(id: "firewall", label: "Open Lightsail firewall ports"),
         .init(id: "outline_manager", label: "Open Outline Manager + paste JSON"),
-        .init(id: "access_key", label: "Done → share Key 0 → copy access key"),
+        .init(id: "data_limit", label: "Rename cursor-key → set 2.5TB data limit"),
+        .init(id: "access_key", label: "Share cursor-key → copy access key"),
         .init(id: "done", label: "Complete"),
     ]
 }

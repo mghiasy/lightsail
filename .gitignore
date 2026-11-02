@@ -12,3 +12,14 @@ DerivedData/
 /blob-report/
 /playwright/.cache/
 .tools/
+.lightsail-server.pid
+.lightsail-server.log
+.venv-app/
+build/
+dist/
+mobile/.dart_tool/
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+mobile/.idea/
+mobile/**/GeneratedPluginRegistrant.*
