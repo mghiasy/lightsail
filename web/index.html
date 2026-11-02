@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lightsail</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,500;0,9..40,700;1,9..40,500&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+    <main class="shell">
+      <p class="brand">Lightsail</p>
+      <h1 class="headline">Provision Lightsail</h1>
+      <p class="support">
+        Create Ubuntu 24 in Oregon (us-west-2a), attach a static IP, and install Outline.
+      </p>
+      <div class="actions">
+        <button type="button" class="login-btn" id="aws-login">
+          Create cusor_instance
+        </button>
+        <button type="button" class="login-btn login-btn--danger" id="aws-cleanup">
+          Clean up
+        </button>
+      </div>
+    </main>
+
+    <div class="modal" id="progress-modal" hidden>
+      <div class="modal__backdrop" data-close-modal></div>
+      <div
+        class="modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="progress-title"
+      >
+        <h2 class="modal__title" id="progress-title">Provisioning progress</h2>
+        <p class="modal__subtitle" id="progress-detail">Starting…</p>
+        <ol class="progress-steps" id="progress-steps"></ol>
+        <pre class="modal__json" id="progress-json" hidden></pre>
+        <pre class="modal__error" id="progress-error" hidden></pre>
+        <button type="button" class="modal__close" id="progress-close" hidden>
+          Close
+        </button>
+      </div>
+    </div>
+
+    <div class="modal" id="message-modal" hidden>
+      <div class="modal__backdrop" data-close-message></div>
+      <div
+        class="modal__panel modal__panel--message"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="message-title"
+        aria-describedby="message-body"
+      >
+        <h2 class="modal__title" id="message-title">Cleanup</h2>
+        <p class="modal__subtitle" id="message-body"></p>
+        <button type="button" class="modal__close" id="message-close">
+          OK
+        </button>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
